@@ -1,5 +1,5 @@
 import type { QuartzTransformerPlugin, BuildCtx } from "@quartz-community/types";
-import type { FullSlug } from "@quartz-community/utils";
+import type { FullSlug, SimpleSlug } from "@quartz-community/utils";
 import { resolveRelative, simplifySlug, splitAnchor } from "@quartz-community/utils";
 import { visit } from "unist-util-visit";
 import type { Root, Element } from "hast";
@@ -45,12 +45,25 @@ export const FolderNoteLinks: QuartzTransformerPlugin = () => ({
       () => {
         const allSlugs = (ctx.allSlugs ?? []) as string[];
         const slugSet = new Set(allSlugs);
+        // file.data.links (graph + backlinks) records *simple* slugs, so we need
+        // the simplified form of every real page to tell resolved from broken.
+        const simpleSlugSet = new Set(allSlugs.map((s) => simplifySlug(s as FullSlug)));
         const folderIndex = buildFolderNoteIndex(allSlugs);
+
+        // For a slug that doesn't resolve, find the full slug of a matching folder
+        // note (`.../name/index`): prefer an exact path match (`foo/bar` +
+        // `foo/bar/index`), then a bare-name match (`[[Bar]]` -> `.../bar/index`).
+        const folderNoteTargetFor = (slug: string): string | undefined => {
+          if (slugSet.has(`${slug}/index`)) return `${slug}/index`;
+          const lastSegment = slug.split("/").pop() ?? slug;
+          return folderIndex.get(lastSegment);
+        };
 
         return (tree: Root, file: VFile) => {
           const fileSlug = file.data.slug as FullSlug | undefined;
           if (!fileSlug) return;
 
+          // 1. Repair rendered <a> links (href + data-slug).
           visit(tree, "element", (node: Element) => {
             if (node.tagName !== "a" || !node.properties) return;
             const classes = (node.properties.className ?? []) as string[];
@@ -59,16 +72,7 @@ export const FolderNoteLinks: QuartzTransformerPlugin = () => ({
             const dataSlug = node.properties["data-slug"];
             if (typeof dataSlug !== "string" || slugSet.has(dataSlug)) return; // already resolves
 
-            // Prefer an exact folder-note match at the resolved path
-            // (e.g. link resolved to `foo/bar`, and `foo/bar/index` exists),
-            // then fall back to a bare-name match (`[[Bar]]` -> `.../bar/index`).
-            let targetFull: string | undefined;
-            if (slugSet.has(`${dataSlug}/index`)) {
-              targetFull = `${dataSlug}/index`;
-            } else {
-              const lastSegment = dataSlug.split("/").pop() ?? dataSlug;
-              targetFull = folderIndex.get(lastSegment);
-            }
+            const targetFull = folderNoteTargetFor(dataSlug);
             if (!targetFull) return;
 
             const href = typeof node.properties.href === "string" ? node.properties.href : "";
@@ -84,6 +88,18 @@ export const FolderNoteLinks: QuartzTransformerPlugin = () => ({
               node.properties.className = classes;
             }
           });
+
+          // 2. Repair the outgoing-links DATA the graph + backlinks are built from.
+          //    crawl-links records these as simple slugs and leaves broken
+          //    folder-note links pointing at a bare `.../name`, so no edge is drawn.
+          const links = file.data.links as SimpleSlug[] | undefined;
+          if (Array.isArray(links)) {
+            file.data.links = links.map((link) => {
+              if (simpleSlugSet.has(link)) return link; // resolves to a real node
+              const targetFull = folderNoteTargetFor(link);
+              return targetFull ? simplifySlug(targetFull as FullSlug) : link;
+            });
+          }
         };
       },
     ];

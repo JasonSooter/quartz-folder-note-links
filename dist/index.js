@@ -290,7 +290,13 @@ var FolderNoteLinks = () => ({
       () => {
         const allSlugs = ctx.allSlugs ?? [];
         const slugSet = new Set(allSlugs);
+        const simpleSlugSet = new Set(allSlugs.map((s2) => simplifySlug(s2)));
         const folderIndex = buildFolderNoteIndex(allSlugs);
+        const folderNoteTargetFor = (slug2) => {
+          if (slugSet.has(`${slug2}/index`)) return `${slug2}/index`;
+          const lastSegment = slug2.split("/").pop() ?? slug2;
+          return folderIndex.get(lastSegment);
+        };
         return (tree, file) => {
           const fileSlug = file.data.slug;
           if (!fileSlug) return;
@@ -300,13 +306,7 @@ var FolderNoteLinks = () => ({
             if (!Array.isArray(classes) || !classes.includes("internal")) return;
             const dataSlug = node.properties["data-slug"];
             if (typeof dataSlug !== "string" || slugSet.has(dataSlug)) return;
-            let targetFull;
-            if (slugSet.has(`${dataSlug}/index`)) {
-              targetFull = `${dataSlug}/index`;
-            } else {
-              const lastSegment = dataSlug.split("/").pop() ?? dataSlug;
-              targetFull = folderIndex.get(lastSegment);
-            }
+            const targetFull = folderNoteTargetFor(dataSlug);
             if (!targetFull) return;
             const href = typeof node.properties.href === "string" ? node.properties.href : "";
             const [, anchor] = splitAnchor(href);
@@ -318,6 +318,14 @@ var FolderNoteLinks = () => ({
               node.properties.className = classes;
             }
           });
+          const links = file.data.links;
+          if (Array.isArray(links)) {
+            file.data.links = links.map((link) => {
+              if (simpleSlugSet.has(link)) return link;
+              const targetFull = folderNoteTargetFor(link);
+              return targetFull ? simplifySlug(targetFull) : link;
+            });
+          }
         };
       }
     ];
