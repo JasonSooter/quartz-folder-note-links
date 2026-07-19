@@ -1,0 +1,57 @@
+{
+  "name": "@functionalstoic/folder-note-links",
+  "version": "0.1.0",
+  "description": "Resolve bare [[Folder]] wikilinks to Obsidian folder notes (Folder/Folder.md) that Quartz slugs as .../folder/index.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Jason Sooter",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@quartz-community/types": "github:quartz-community/types",
+    "@quartz-community/utils": "github:quartz-community/utils"
+  },
+  "devDependencies": {
+    "@types/hast": "^3.0.4",
+    "@types/node": "^24.10.0",
+    "github-slugger": "^2.0.0",
+    "hast-util-to-jsx-runtime": "^2.3.2",
+    "preact": "^10.29.7",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "unist-util-visit": "^5.0.0",
+    "vfile": "^6.0.3"
+  },
+  "quartz": {
+    "name": "folder-note-links",
+    "displayName": "Folder Note Links",
+    "category": [
+      "transformer"
+    ],
+    "version": "0.1.0",
+    "quartzVersion": ">=5.0.0",
+    "dependencies": [],
+    "defaultEnabled": true,
+    "defaultOrder": 65
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
